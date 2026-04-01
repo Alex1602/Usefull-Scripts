@@ -1,12 +1,16 @@
 javascript:(function(){
-const patterns={ipv4:/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g,ipv6:/\b(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::1|([0-9a-fA-F]{1,4}:){1,7}:)\b/g,md5:/\b[a-fA-F0-9]{32}\b/g,sha1:/\b[a-fA-F0-9]{40}\b/g,sha256:/\b[a-fA-F0-9]{64}\b/g,url:/\bhttps?:\/\/[^\s"'<>]+/gi,defanged:/\bhxxps?:\/\/[^\s"'<>]+|\b[a-zA-Z0-9.-]+\[\.\][a-zA-Z]{2,}/gi,domain:/\b[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g};
+const patterns={ipv4:/\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b/g,defanged_ip: /\b\d{1,3}(\[\.\]|\(\.\)|\s?dot\s?)\d{1,3}(\[\.\]|\(\.\)|\s?dot\s?)\d{1,3}(\[\.\]|\(\.\)|\s?dot\s?)\d{1,3}\b/gi,ipv6:/\b(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::1|([0-9a-fA-F]{1,4}:){1,7}:)\b/g,md5:/\b[a-fA-F0-9]{32}\b/g,sha1:/\b[a-fA-F0-9]{40}\b/g,sha256:/\b[a-fA-F0-9]{64}\b/g,url:/\bhttps?:\/\/[^\s"'<>]+/gi,defanged:/\b(?:hxxps?:\/\/)?[a-zA-Z0-9.-]+(?:\[\.\][a-zA-Z0-9.-]+)+\b/gi,domain:/\b[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/g};
 
-const colors={ipv4:"#4FC3F7",ipv6:"#4DD0E1",md5:"#CE93D8",sha1:"#BA68C8",sha256:"#8E24AA",url:"#FFB74D",defanged:"#FFD54F",domain:"#81C784"};
+const colors={ipv4:"#4FC3F7",defanged_ip: "#90CAF9",ipv6:"#4DD0E1",md5:"#CE93D8",sha1:"#BA68C8",sha256:"#8E24AA",url:"#FFB74D",defanged:"#FFD54F",domain:"#81C784"};
 
 const seen=new Map();
 const results=[];
 
-function refang(str){return str.replace(/^hxxp/i,"http").replace(/\[\.\]/g,".");}
+function refang(str){
+  return str
+    .replace(/^hxxp/i,"http")
+    .replace(/\[\.\]|\(\.\)|\s?dot\s?/gi,".");
+}
 
 function addIOC(type,value,context){
 const key=type+"|"+value;
@@ -17,24 +21,40 @@ results.push(entry);
 }
 
 function highlightNode(node){
-let text=node.nodeValue;
-let replaced=false;
+  let originalText = node.nodeValue;
+  let newHTML = "";
+  let lastIndex = 0;
+  let hasMatch = false;
+  const combined = new RegExp(
+    Object.entries(patterns)
+      .map(([type, r]) => `(?<${type}>${r.source})`)
+      .join("|"),
+    "gi"
+  );
+  let match;
+  while((match = combined.exec(originalText)) !== null){
+    hasMatch = true;
+    const matchText = match[0];
+    const offset = match.index;
+    let type = Object.keys(match.groups).find(t => match.groups[t]);
+    newHTML += originalText.substring(lastIndex, offset);
+    const context = originalText.substring(
+      Math.max(0, offset - 30),
+      offset + matchText.length + 30
+    );
 
-Object.entries(patterns).forEach(([type,regex])=>{
-text=text.replace(regex,(match)=>{
-const idx=node.nodeValue.indexOf(match);
-const context=node.nodeValue.substring(Math.max(0,idx-30),idx+match.length+30);
-addIOC(type,match,context);
-replaced=true;
-return `<mark data-ioc="${type}|${match}" style="background:${colors[type]};color:black;padding:1px 2px;border-radius:2px;">${match}</mark>`;
-});
-});
+    addIOC(type, matchText, context);
+    newHTML += `<mark data-ioc="${type}|${matchText}" style="background:${colors[type]};color:black;padding:1px 2px;border-radius:2px;">${matchText}</mark>`;
 
-if(replaced){
-const span=document.createElement("span");
-span.innerHTML=text;
-node.replaceWith(span);
-}
+    lastIndex = offset + matchText.length;
+  }
+  if(hasMatch){
+    newHTML += originalText.substring(lastIndex);
+
+    const span = document.createElement("span");
+    span.innerHTML = newHTML;
+    node.replaceWith(span);
+  }
 }
 
 function walk(node){
