@@ -92,41 +92,62 @@ box.appendChild(title);
 const grouped={};
 results.forEach(i=>{if(!grouped[i.type])grouped[i.type]=[];grouped[i.type].push(i);});
 
-Object.entries(grouped).forEach(([type,items])=>{
-const header=document.createElement("div");
-header.innerText=`${type.toUpperCase()} (${items.length})`;
-header.style=`margin-top:10px;color:${colors[type]};font-weight:bold;`;
-box.appendChild(header);
+Object.entries(grouped).forEach(([type, items])=>{
+  const headerRow = document.createElement("div");
+  headerRow.style = "margin-top:10px; display:flex; align-items:center; justify-content:space-between;";
 
-items.forEach(ioc=>{
-const row=document.createElement("div");
-row.style="margin:4px 0;display:flex;align-items:center;flex-wrap:wrap;";
+  const header = document.createElement("div");
+  header.innerText = `${type.toUpperCase()} (${items.length})`;
+  header.style = `color:${colors[type]};font-weight:bold;`;
 
-const goBtn=makeButton("Go");
-goBtn.onclick=()=>{
-if(ioc.node){
-ioc.node.scrollIntoView({behavior:"smooth",block:"center"});
-ioc.node.style.outline="2px solid red";
-setTimeout(()=>ioc.node.style.outline="",1500);
-}
-};
+  const copyAllBtn = makeButton("Copy All");
 
-const copyBtn=makeButton("Copy");
-copyBtn.onclick=()=>{
-navigator.clipboard.writeText(ioc.value);
-copyBtn.innerText="✓";
-setTimeout(()=>copyBtn.innerText="Copy",800);
-};
+  copyAllBtn.onclick = ()=>{
+    const sorted = items
+      .map(i => i.value)
+      .sort((a,b)=>a.localeCompare(b));
 
-const text=document.createElement("span");
-text.innerText=ioc.value;
-text.style="margin-left:4px;word-break:break-all;";
+    const text = sorted.join("\n");
 
-row.appendChild(goBtn);
-row.appendChild(copyBtn);
-row.appendChild(text);
-box.appendChild(row);
-});
+    navigator.clipboard.writeText(text);
+
+    copyAllBtn.innerText = "✓";
+    setTimeout(()=>copyAllBtn.innerText="Copy All",1000);
+  };
+
+  headerRow.appendChild(header);
+  headerRow.appendChild(copyAllBtn);
+  box.appendChild(headerRow);
+
+  items.forEach(ioc=>{
+    const row = document.createElement("div");
+    row.style = "margin:4px 0; display:flex; align-items:center; flex-wrap:wrap;";
+
+    const goBtn = makeButton("Go");
+    goBtn.onclick = ()=>{
+      if(ioc.node){
+        ioc.node.scrollIntoView({behavior:"smooth",block:"center"});
+        ioc.node.style.outline = "2px solid red";
+        setTimeout(()=>ioc.node.style.outline="",1500);
+      }
+    };
+
+    const copyBtn = makeButton("Copy");
+    copyBtn.onclick = ()=>{
+      navigator.clipboard.writeText(ioc.value);
+      copyBtn.innerText = "✓";
+      setTimeout(()=>copyBtn.innerText="Copy",800);
+    };
+
+    const text = document.createElement("span");
+    text.innerText = ioc.value;
+    text.style = "margin-left:4px; word-break:break-all;";
+
+    row.appendChild(goBtn);
+    row.appendChild(copyBtn);
+    row.appendChild(text);
+    box.appendChild(row);
+  });
 });
 
 const exportBtn=makeButton("Export JSON");
